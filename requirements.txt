@@ -1,0 +1,3 @@
+mutagen>=1.47
+# hanya untuk membuat .exe (build.bat memasangnya otomatis):
+# pyinstaller
