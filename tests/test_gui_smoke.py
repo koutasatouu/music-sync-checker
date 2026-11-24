@@ -116,6 +116,7 @@ class Menu(Widget):
     def add_separator(self, *a, **k): pass
 tk.Menu = Menu
 tk.Canvas = Widget
+tk.Entry = Widget
 tk.Frame = Widget
 tk.Listbox, tk.StringVar, tk.BooleanVar, tk.TclError = Listbox, Var, Var, Exception
 for n in ("Frame", "Label", "Button", "Entry", "Combobox", "Notebook", "Scrollbar", "Progressbar",
@@ -134,6 +135,9 @@ os.environ["APPDATA"] = tempfile.mkdtemp()
 
 import sync_engine as se  # noqa: E402
 import music_sync_checker as app_mod  # noqa: E402
+if os.environ.get("FORCE_ICONS"):
+    import ui_kit
+    ui_kit._FA_OK = True
 
 TAGS = {}
 se.read_tags_mutagen = lambda p: dict(TAGS.get(p, {"title": "", "artist": "", "album": "", "duration": None}))
@@ -245,7 +249,7 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.m, "Unsorted", "Grenade.flac")))
         self.assertEqual(a.result.counts()[se.MISSING], 0)
 
-        # tab koleksi induk -> perangkat
+        # master tab: master collection -> device
         a.mfilter_var.set("not")
         a._refresh_master()
         titles = [r[0][1] for r in a.mtree.rows.values()]

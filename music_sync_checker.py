@@ -32,28 +32,10 @@ def resource_path(name: str) -> str:
     return os.path.join(getattr(sys, "_MEIPASS", app_dir()), name)
 
 
-class Theme:  # soft dark palette, inspired by music streaming apps
-    BG = "#161618"
-    SIDE = "#0F0F11"
-    SURF = "#1F1F23"
-    SURF2 = "#2A2A30"
-    HOVER = "#35353C"
-    BORDER = "#2C2C32"
-    TEXT = "#F2F2F3"
-    MUTED = "#9A9AA3"
-    DIM = "#6C6C75"
-    ACCENT = "#3FCF8E"
-    ACCENT_H = "#35B77D"
-    ACCENT_FG = "#08150F"
-    ENTRY = "#17171A"
-    SEL = "#2B3A33"
-    OK = "#6EE7A8"
-    WARN = "#F5D26B"
-    ERR = "#F28B82"
-    INFO = "#8AB4F8"
+from ui_kit import (T, Badge, Chip, NavItem, PillButton, RoundCheck, RoundEntry, RoundFrame,  # noqa: E402
+                    RoundRadio, SoftProgress, PopupMenu, has_icons, init_scale, load_icon_font, px)
 
-
-T = Theme
+load_icon_font(resource_path("fontawesome-webfont.ttf"))
 
 
 def set_dark_titlebar(window) -> None:
@@ -80,111 +62,22 @@ def enable_dpi_awareness() -> None:
             pass
 
 
-# ------------------------------------------------------------------ rounded "pill" button
-class PillButton(tk.Canvas):
-    KINDS = {  # normal bg, hover bg, text colour
-        "primary": (T.ACCENT, T.ACCENT_H, T.ACCENT_FG),
-        "secondary": (T.SURF2, T.HOVER, T.TEXT),
-        "ghost": (None, T.SURF2, T.MUTED),
-    }
-
-    def __init__(self, parent, text, command=None, kind="secondary", bg=T.BG, padx=18, height=34, min_width=0,
-                 font=("Segoe UI", 9, "bold")):
-        super().__init__(parent, height=height, bg=bg, highlightthickness=0, bd=0)
-        self._pb_text, self._pb_cmd, self._pb_kind, self._pb_bg = text, command, kind, bg
-        self._pb_padx, self._pb_ht, self._pb_minw, self._pb_font = padx, height, min_width, font
-        self._pb_state, self._pb_hover, self._pb_down = "normal", False, False
-        self.bind("<Enter>", self._pb_enter)
-        self.bind("<Leave>", self._pb_leave)
-        self.bind("<ButtonPress-1>", self._pb_press)
-        self.bind("<ButtonRelease-1>", self._pb_release)
-        self._pb_draw()
-
-    def _pb_round(self, x1, y1, x2, y2, r, **kw):
-        pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2, x2 - r, y2, x1 + r, y2,
-               x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
-        return self.create_polygon(pts, smooth=True, **kw)
-
-    def _pb_draw(self):
-        self.delete("all")
-        normal, hover, fg = self.KINDS.get(self._pb_kind, self.KINDS["secondary"])
-        disabled = self._pb_state == "disabled"
-        if disabled:
-            fill = "#26302B" if self._pb_kind == "primary" else (None if self._pb_kind == "ghost" else "#232328")
-            fg = "#5F7A6C" if self._pb_kind == "primary" else "#5E5E66"
-        else:
-            fill = hover if self._pb_hover else normal
-        probe = self.create_text(0, 0, text=self._pb_text, font=self._pb_font, anchor="nw")
-        bb = self.bbox(probe) or (0, 0, 7 * len(str(self._pb_text)), 16)
-        self.delete(probe)
-        w = max(int(bb[2] - bb[0]) + 2 * self._pb_padx, self._pb_minw)
-        tk.Canvas.configure(self, width=w)
-        h = self._pb_ht
-        if fill:
-            self._pb_round(1, 1, w - 1, h - 1, h // 2 - 1, fill=fill, outline=fill)
-        self.create_text(w // 2, h // 2, text=self._pb_text, font=self._pb_font, fill=fg)
-        try:
-            tk.Canvas.configure(self, cursor="arrow" if disabled else "hand2")
-        except Exception:
-            pass
-
-    def configure(self, cnf=None, **kw):
-        redraw = False
-        if "text" in kw:
-            self._pb_text = kw.pop("text")
-            redraw = True
-        if "state" in kw:
-            self._pb_state = kw.pop("state")
-            redraw = True
-        if "command" in kw:
-            self._pb_cmd = kw.pop("command")
-        kw.pop("style", None)
-        if kw:
-            super().configure(**kw)
-        if redraw:
-            self._pb_draw()
-
-    config = configure
-
-    def _pb_enter(self, _e):
-        self._pb_hover = True
-        self._pb_draw()
-
-    def _pb_leave(self, _e):
-        self._pb_hover = self._pb_down = False
-        self._pb_draw()
-
-    def _pb_press(self, _e):
-        self._pb_down = True
-
-    def _pb_release(self, e):
-        was_down, self._pb_down = self._pb_down, False
-        if was_down and self._pb_state != "disabled" and self._pb_cmd:
-            try:
-                inside = 0 <= e.x <= int(self.winfo_width()) and 0 <= e.y <= int(self.winfo_height())
-            except Exception:
-                inside = True
-            if inside:
-                self._pb_cmd()
-
-
 # ------------------------------------------------------------------ splash screen
 class Splash:
     """Small borderless loading window shown while the app starts up."""
 
     def __init__(self, root):
         self.root = root
+        init_scale(root)
         style = ttk.Style(root)
         try:
             style.theme_use("clam")
         except Exception:
             pass
-        style.configure("Splash.Horizontal.TProgressbar", troughcolor=T.SURF2, background=T.ACCENT,
-                        bordercolor=T.SURF2, lightcolor=T.ACCENT, darkcolor=T.ACCENT, thickness=6)
         self.win = tk.Toplevel(root)
         self.win.overrideredirect(True)
         self.win.configure(bg=T.ACCENT)
-        w, h = 460, 250
+        w, h = px(460), px(250)
         x = (root.winfo_screenwidth() - w) // 2
         y = (root.winfo_screenheight() - h) // 2
         self.win.geometry(f"{w}x{h}+{x}+{y}")
@@ -198,9 +91,9 @@ class Splash:
             pass
         tk.Label(inner, text=APP_TITLE, bg=T.BG, fg=T.TEXT, font=("Segoe UI", 18, "bold")).pack()
         self.status = tk.Label(inner, text="Starting…", bg=T.BG, fg=T.MUTED, font=("Segoe UI", 9))
-        self.status.pack(pady=(6, 10))
-        self.bar = ttk.Progressbar(inner, mode="determinate", maximum=100, length=360,
-                                   style="Splash.Horizontal.TProgressbar")
+        self.status.pack(pady=(6, 12))
+        self.bar = SoftProgress(inner, width=360, height=8, bg=T.BG)
+        self.bar.configure(maximum=100, value=0)
         self.bar.pack()
         try:
             self.win.attributes("-topmost", True)
@@ -289,10 +182,57 @@ def short_path(t: se.Track) -> str:
     return f"{base}{os.sep}{t.rel}"
 
 
+# ------------------------------------------------------------------ device list (rounded rows)
+class DeviceList:
+    """List of device folders shown as rounded rows. Mimics the tiny part of Listbox the app needs."""
+
+    def __init__(self, parent, on_change=None, bg=T.SURF):
+        self.items: list = []
+        self.on_change = on_change
+        self.bg = bg
+        self.frame = tk.Frame(parent, bg=bg)
+        self._render()
+
+    def _render(self):
+        for w in (self.frame.winfo_children() or []):
+            w.destroy()
+        if not self.items:
+            tk.Label(self.frame, text="No device added yet.", bg=self.bg, fg=T.DIM,
+                     font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 6))
+        for i, path in enumerate(self.items):
+            row = RoundFrame(self.frame, bg=self.bg, fill=T.SURF2, radius=14, pad=(14, 6))
+            row.pack(fill="x", pady=(0, 6))
+            inn = row.inner
+            PillButton(inn, "", lambda i=i: self.delete(i), kind="ghost", icon="times", height=28, padx=10,
+                       bg=T.SURF2).pack(side="right")
+            if has_icons():
+                from ui_kit import ICONS, icon_font
+                tk.Label(inn, text=ICONS["hdd"], font=icon_font(11), bg=T.SURF2, fg=T.ACCENT).pack(side="left", padx=(0, 10))
+            tk.Label(inn, text=path, bg=T.SURF2, fg=T.TEXT, font=("Segoe UI", 10), anchor="w").pack(side="left")
+
+    def insert(self, idx, value):
+        self.items.append(value)
+        self._render()
+
+    def get(self, a=0, b=None):
+        return tuple(self.items)
+
+    def delete(self, i, j=None):
+        if 0 <= i < len(self.items):
+            del self.items[i]
+        self._render()
+        if self.on_change:
+            self.on_change()
+
+    def curselection(self):
+        return ()
+
+
 class App:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title(APP_TITLE)
+        init_scale(root)
         self.cfg = se.load_json(SETTINGS_PATH, {})
         self.decisions = se.load_json(DECISIONS_PATH, {})
         self._fit_window()
@@ -325,9 +265,9 @@ class App:
         try:
             sw, sh = int(self.root.winfo_screenwidth()), int(self.root.winfo_screenheight())
             m = re.match(r"(\d+)x(\d+)", str(self.cfg.get("geometry", "")))
-            w, h = (int(m.group(1)), int(m.group(2))) if m else (1180, 780)
+            w, h = (int(m.group(1)), int(m.group(2))) if m else (px(1200), px(800))
             w, h = max(900, min(w, sw - 40)), max(560, min(h, sh - 110))
-            self.root.minsize(min(1000, w), min(620, h))
+            self.root.minsize(min(px(1020), w), min(px(660), h))
             self.root.geometry(f"{w}x{h}+{max(0, (sw - w) // 2)}+{max(0, (sh - h) // 2 - 20)}")
         except Exception:
             self.root.geometry("1100x700")
@@ -351,64 +291,47 @@ class App:
         st.configure("Card.TFrame", background=T.SURF)
         st.configure("TLabel", background=T.BG, foreground=T.TEXT)
         st.configure("Card.TLabel", background=T.SURF, foreground=T.TEXT)
-        st.configure("CardTitle.TLabel", background=T.SURF, foreground=T.TEXT, font=("Segoe UI", 11, "bold"))
+        st.configure("CardTitle.TLabel", background=T.SURF, foreground=T.TEXT, font=("Segoe UI", 12, "bold"))
         st.configure("CardMuted.TLabel", background=T.SURF, foreground=T.MUTED, font=("Segoe UI", 9))
+        st.configure("CardErr.TLabel", background=T.SURF, foreground=T.ERR, font=("Segoe UI", 9, "bold"))
         st.configure("Muted.TLabel", background=T.BG, foreground=T.MUTED, font=("Segoe UI", 9))
         st.configure("Hint.TLabel", background=T.BG, foreground=T.MUTED, font=("Segoe UI", 9))
         st.configure("Warn.TLabel", background=T.BG, foreground=T.WARN, font=("Segoe UI", 9))
-        st.configure("Err.TLabel", background=T.BG, foreground=T.ERR, font=("Segoe UI", 9, "bold"))
         st.configure("Title.TLabel", background=T.BG, foreground=T.TEXT, font=("Segoe UI", 22, "bold"))
         st.configure("Bar.TLabel", background=T.SURF, foreground=T.MUTED, font=("Segoe UI", 9))
-        st.configure("TEntry", fieldbackground=T.ENTRY, foreground=T.TEXT, insertcolor=T.TEXT, bordercolor=T.BORDER,
-                     lightcolor=T.BORDER, darkcolor=T.BORDER, padding=6)
-        st.map("TEntry", bordercolor=[("focus", T.ACCENT)], lightcolor=[("focus", T.ACCENT)], darkcolor=[("focus", T.ACCENT)])
-        st.configure("TCombobox", fieldbackground=T.ENTRY, background=T.SURF2, foreground=T.TEXT, arrowcolor=T.TEXT,
-                     bordercolor=T.BORDER, lightcolor=T.BORDER, darkcolor=T.BORDER, padding=5)
-        st.map("TCombobox", fieldbackground=[("readonly", T.ENTRY)], foreground=[("readonly", T.TEXT)])
-        st.configure("TCheckbutton", background=T.BG, foreground=T.TEXT, focuscolor=T.BG)
-        st.map("TCheckbutton", background=[("active", T.BG)])
-        st.configure("Card.TCheckbutton", background=T.SURF, foreground=T.TEXT, focuscolor=T.SURF)
-        st.map("Card.TCheckbutton", background=[("active", T.SURF)])
-        st.configure("Chip.Toolbutton", background=T.SURF2, foreground=T.TEXT, padding=(14, 6), relief="flat",
-                     borderwidth=0, focuscolor=T.SURF2, font=("Segoe UI", 9, "bold"))
-        st.map("Chip.Toolbutton", background=[("selected", T.TEXT), ("active", T.HOVER)],
-               foreground=[("selected", "#121212")])
-        st.configure("Soft.Horizontal.TProgressbar", troughcolor=T.SURF2, background=T.ACCENT, bordercolor=T.SURF,
-                     lightcolor=T.ACCENT, darkcolor=T.ACCENT, thickness=6)
         st.layout("Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
-        st.configure("Treeview", background=T.BG, foreground=T.TEXT, fieldbackground=T.BG, borderwidth=0,
-                     rowheight=38, font=("Segoe UI", 10))
+        st.configure("Treeview", background=T.SURF, foreground=T.TEXT, fieldbackground=T.SURF, borderwidth=0,
+                     rowheight=px(38), font=("Segoe UI", 10))
         st.map("Treeview", background=[("selected", T.SEL)], foreground=[("selected", "#FFFFFF")])
-        st.configure("Treeview.Heading", background=T.BG, foreground=T.DIM, relief="flat", borderwidth=0,
+        st.configure("Treeview.Heading", background=T.SURF, foreground=T.DIM, relief="flat", borderwidth=0,
                      font=("Segoe UI", 8, "bold"), padding=(8, 6))
-        st.map("Treeview.Heading", background=[("active", T.BG)], foreground=[("active", T.TEXT)])
-        st.configure("Vertical.TScrollbar", background=T.SURF2, troughcolor=T.BG, bordercolor=T.BG,
+        st.map("Treeview.Heading", background=[("active", T.SURF)], foreground=[("active", T.TEXT)])
+        st.configure("Vertical.TScrollbar", background=T.SURF2, troughcolor=T.SURF, bordercolor=T.SURF,
                      arrowcolor=T.MUTED, lightcolor=T.SURF2, darkcolor=T.SURF2, relief="flat", gripcount=0)
         st.map("Vertical.TScrollbar", background=[("active", T.HOVER)])
-        self.root.option_add("*TCombobox*Listbox.background", T.ENTRY)
-        self.root.option_add("*TCombobox*Listbox.foreground", T.TEXT)
-        self.root.option_add("*TCombobox*Listbox.selectBackground", T.ACCENT)
-        self.root.option_add("*TCombobox*Listbox.selectForeground", T.ACCENT_FG)
 
     # -------------------------------------------------------------------- UI helpers
     def _card(self, parent, pady=(0, 14)):
-        outer = tk.Frame(parent, bg=T.SURF)
-        outer.pack(fill="x", pady=pady)
-        inner = ttk.Frame(outer, style="Card.TFrame", padding=(18, 14))
-        inner.pack(fill="both", expand=True)
-        return inner
+        rf = RoundFrame(parent, bg=T.BG, fill=T.SURF, radius=20, pad=(22, 18))
+        rf.pack(fill="x", pady=pady)
+        return rf.inner
+
+    def _card_head(self, parent, icon, title, sub):
+        head = tk.Frame(parent, bg=T.SURF)
+        head.pack(fill="x")
+        Badge(head, icon, bg=T.SURF).pack(side="left")
+        txt = tk.Frame(head, bg=T.SURF)
+        txt.pack(side="left", padx=14)
+        ttk.Label(txt, text=title, style="CardTitle.TLabel").pack(anchor="w")
+        ttk.Label(txt, text=sub, style="CardMuted.TLabel").pack(anchor="w")
 
     def _heading(self, parent, title, sub=""):
         ttk.Label(parent, text=title, style="Title.TLabel").pack(anchor="w")
         if sub:
-            ttk.Label(parent, text=sub, style="Muted.TLabel", wraplength=860, justify="left").pack(anchor="w", pady=(2, 0))
-
-    def _menu(self, parent):
-        return tk.Menu(parent, tearoff=0, bg=T.SURF2, fg=T.TEXT, activebackground=T.ACCENT,
-                       activeforeground=T.ACCENT_FG, relief="flat", bd=0, font=("Segoe UI", 9))
+            ttk.Label(parent, text=sub, style="Muted.TLabel", wraplength=px(860), justify="left").pack(anchor="w", pady=(2, 0))
 
     def _make_tree(self, parent, columns, widths, height=10):
-        wrap = ttk.Frame(parent)
+        wrap = tk.Frame(parent, bg=T.SURF)
         wrap.columnconfigure(0, weight=1)
         wrap.rowconfigure(0, weight=1)
         tree = ttk.Treeview(wrap, columns=[c[0] for c in columns], show="headings", selectmode="extended", height=height)
@@ -427,25 +350,29 @@ class App:
         self.root.rowconfigure(0, weight=1)
 
         # ---------- sidebar
-        side = tk.Frame(self.root, bg=T.SIDE, width=220)
+        side = tk.Frame(self.root, bg=T.SIDE, width=px(236))
         side.grid(row=0, column=0, sticky="ns")
         side.pack_propagate(False)
-        tk.Label(side, text="♫  Music Sync", bg=T.SIDE, fg=T.TEXT, font=("Segoe UI", 15, "bold"),
-                 anchor="w").pack(fill="x", padx=20, pady=(24, 18))
+        brand = tk.Frame(side, bg=T.SIDE)
+        brand.pack(fill="x", padx=px(22), pady=(px(26), px(20)))
+        Badge(brand, "music", bg=T.SIDE, size=40).pack(side="left")
+        tk.Label(brand, text="Music Sync", bg=T.SIDE, fg=T.TEXT, font=("Segoe UI", 15, "bold")).pack(side="left", padx=12)
         tk.Label(side, text="LIBRARY", bg=T.SIDE, fg=T.DIM, font=("Segoe UI", 8, "bold"),
-                 anchor="w").pack(fill="x", padx=22, pady=(0, 4))
-        for key, text in (("folders", "▣   Folders"), ("check", "✔   Device check"),
-                          ("master", "♫   Master → device"), ("log", "≡   Activity log")):
-            self._nav_item(side, key, text)
+                 anchor="w").pack(fill="x", padx=px(26), pady=(0, 6))
+        for key, text, icon in (("folders", "Folders", "folder"), ("check", "Device check", "check_circle"),
+                                ("master", "Master → device", "headphones"), ("log", "Activity log", "list")):
+            item = NavItem(side, text, icon, lambda k=key: self.show_page(k), bg=T.SIDE)
+            item.pack(fill="x", padx=px(14), pady=2)
+            self.nav[key] = item
 
         bottom = tk.Frame(side, bg=T.SIDE)
-        bottom.pack(side="bottom", fill="x", padx=18, pady=18)
-        self.btn_scan = PillButton(bottom, "▶  Check Now", self.start_scan, kind="primary", bg=T.SIDE, height=42,
-                                   min_width=184, font=("Segoe UI", 10, "bold"))
+        bottom.pack(side="bottom", fill="x", padx=px(18), pady=px(20))
+        self.btn_scan = PillButton(bottom, "Check Now", self.start_scan, kind="primary", icon="sync", bg=T.SIDE,
+                                   height=44, min_width=196, size=10)
         self.btn_scan.pack(anchor="w")
-        self.btn_report = PillButton(bottom, "Save report (.csv)", self.export_csv, kind="ghost", bg=T.SIDE, height=30,
-                                     min_width=184)
-        self.btn_report.pack(anchor="w", pady=(8, 0))
+        self.btn_report = PillButton(bottom, "Save report (.csv)", self.export_csv, kind="ghost", icon="save",
+                                     bg=T.SIDE, height=34, min_width=196)
+        self.btn_report.pack(anchor="w", pady=(10, 0))
 
         # ---------- content area
         self.content = tk.Frame(self.root, bg=T.BG)
@@ -456,149 +383,136 @@ class App:
         self.pages["log"] = self._build_log_page()
 
         # ---------- bottom status bar
-        bar = tk.Frame(self.root, bg=T.SURF, height=52)
+        bar = tk.Frame(self.root, bg=T.SURF, height=px(56))
         bar.grid(row=1, column=0, columnspan=2, sticky="ew")
         bar.grid_propagate(False)
         bar.columnconfigure(0, weight=1)
         bar.rowconfigure(0, weight=1)
         self.status_var = tk.StringVar(value="Choose your master folder and device, then click Check Now.")
-        ttk.Label(bar, textvariable=self.status_var, style="Bar.TLabel").grid(row=0, column=0, sticky="w", padx=(22, 12))
-        self.progress = ttk.Progressbar(bar, mode="determinate", length=240, style="Soft.Horizontal.TProgressbar")
-        self.progress.grid(row=0, column=1, padx=(0, 12))
-        self.btn_cancel = PillButton(bar, "Cancel", self.cancel_job, kind="secondary", bg=T.SURF, height=30, padx=14)
-        self.btn_cancel.grid(row=0, column=2, padx=(0, 18))
+        ttk.Label(bar, textvariable=self.status_var, style="Bar.TLabel").grid(row=0, column=0, sticky="w", padx=(24, 12))
+        self.progress = SoftProgress(bar, width=240, height=8, bg=T.SURF)
+        self.progress.grid(row=0, column=1, padx=(0, 14))
+        self.btn_cancel = PillButton(bar, "Cancel", self.cancel_job, kind="secondary", icon="times", bg=T.SURF,
+                                     height=32, padx=14)
+        self.btn_cancel.grid(row=0, column=2, padx=(0, 20))
         self.btn_cancel.configure(state="disabled")
-
-    def _nav_item(self, parent, key, text):
-        lbl = tk.Label(parent, text=text, bg=T.SIDE, fg=T.MUTED, font=("Segoe UI", 10, "bold"), anchor="w",
-                       padx=22, pady=9, cursor="hand2")
-        lbl.pack(fill="x")
-        lbl.bind("<Button-1>", lambda e, k=key: self.show_page(k))
-        lbl.bind("<Enter>", lambda e, l=lbl, k=key: l.configure(bg=T.SURF if k == self.page else T.SURF2) or None)
-        lbl.bind("<Leave>", lambda e, l=lbl, k=key: l.configure(bg=T.SURF if k == self.page else T.SIDE))
-        self.nav[key] = lbl
 
     def show_page(self, name):
         for f in self.pages.values():
             f.pack_forget()
-        self.pages[name].pack(fill="both", expand=True, padx=30, pady=(26, 10))
+        self.pages[name].pack(fill="both", expand=True, padx=px(32), pady=(px(28), px(12)))
         self.page = name
-        for k, lbl in self.nav.items():
-            on = k == name
-            lbl.configure(bg=T.SURF if on else T.SIDE, fg=T.TEXT if on else T.MUTED)
+        for k, item in self.nav.items():
+            item.set_active(k == name)
 
     # -------------------------------------------------------------------- folders page
     def _build_folders_page(self):
         page = tk.Frame(self.content, bg=T.BG)
         self._heading(page, "Your folders", "Tell the app where your full collection lives and which player to check.")
-        body = ttk.Frame(page)
-        body.pack(fill="x", pady=(18, 0))
+        body = tk.Frame(page, bg=T.BG)
+        body.pack(fill="x", pady=(20, 0))
 
         c = self._card(body)
-        ttk.Label(c, text="Master folder", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(c, text="Your complete collection on the HDD/SSD.", style="CardMuted.TLabel").grid(row=1, column=0, sticky="w")
-        c.columnconfigure(0, weight=1)
+        self._card_head(c, "folder", "Master folder", "Your complete collection on the HDD/SSD.")
+        row = tk.Frame(c, bg=T.SURF)
+        row.pack(fill="x", pady=(16, 0))
+        self.btn_master = PillButton(row, "Browse", self.pick_master, icon="folder_open", bg=T.SURF)
+        self.btn_master.pack(side="right", padx=(10, 0))
         self.master_var = tk.StringVar()
-        ttk.Entry(c, textvariable=self.master_var).grid(row=2, column=0, sticky="we", pady=(10, 0), padx=(0, 10))
-        self.btn_master = PillButton(c, "Browse…", self.pick_master, bg=T.SURF)
-        self.btn_master.grid(row=2, column=1, pady=(10, 0))
+        RoundEntry(row, self.master_var, icon="folder", bg=T.SURF).pack(side="left", fill="x", expand=True)
 
         c = self._card(body)
-        c.columnconfigure(0, weight=1)
-        ttk.Label(c, text="Device", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(c, text="Your MP3 player or SD card. Player with 2 SD cards? Add both; they count as one device.",
-                  style="CardMuted.TLabel").grid(row=1, column=0, sticky="w")
-        self.dev_list = tk.Listbox(c, height=3, bg=T.ENTRY, fg=T.TEXT, selectbackground=T.SEL, selectforeground="#FFFFFF",
-                                   relief="flat", highlightthickness=1, highlightbackground=T.BORDER,
-                                   highlightcolor=T.ACCENT, exportselection=False, font=("Segoe UI", 10), bd=0)
-        self.dev_list.grid(row=2, column=0, rowspan=2, sticky="we", pady=(10, 0), padx=(0, 10))
-        self.btn_add_dev = PillButton(c, "+ Add", self.add_device, bg=T.SURF, min_width=90)
-        self.btn_add_dev.grid(row=2, column=1, pady=(10, 0))
-        self.btn_del_dev = PillButton(c, "Remove", self.remove_device, bg=T.SURF, min_width=90)
-        self.btn_del_dev.grid(row=3, column=1, pady=(6, 0), sticky="n")
+        self._card_head(c, "hdd", "Device", "Your MP3 player or SD card. Two SD cards? Add both; they count as one device.")
+        self.dev_list = DeviceList(c, on_change=self._sync_dev_combo, bg=T.SURF)
+        self.dev_list.frame.pack(fill="x", pady=(16, 6))
+        self.btn_add_dev = PillButton(c, "Add device", self.add_device, icon="plus", bg=T.SURF)
+        self.btn_add_dev.pack(anchor="w")
 
         c = self._card(body)
-        c.columnconfigure(0, weight=1)
-        ttk.Label(c, text="Songs found only on the device", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(c, text="Where \"Copy to master\" should put them.", style="CardMuted.TLabel").grid(row=1, column=0, sticky="w")
+        self._card_head(c, "download", "Songs found only on the device", "Where \"Copy to master\" puts them.")
+        row = tk.Frame(c, bg=T.SURF)
+        row.pack(fill="x", pady=(16, 0))
+        PillButton(row, "Browse", self.pick_dest_master, icon="folder_open", bg=T.SURF).pack(side="right", padx=(10, 0))
         self.dest_master_var = tk.StringVar()
-        ttk.Entry(c, textvariable=self.dest_master_var).grid(row=2, column=0, sticky="we", pady=(10, 0), padx=(0, 10))
-        PillButton(c, "Browse…", self.pick_dest_master, bg=T.SURF).grid(row=2, column=1, pady=(10, 0))
-        opts = ttk.Frame(c, style="Card.TFrame")
-        opts.grid(row=3, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        RoundEntry(row, self.dest_master_var, icon="folder", bg=T.SURF).pack(side="left", fill="x", expand=True)
         self.keep_sub_var = tk.BooleanVar(value=False)
         self.lrc_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(opts, text="Keep sub-folders from the device", variable=self.keep_sub_var,
-                        style="Card.TCheckbutton").pack(side="left", padx=(0, 22))
-        ttk.Checkbutton(opts, text="Also copy lyrics (.lrc)", variable=self.lrc_var,
-                        style="Card.TCheckbutton").pack(side="left")
+        opts = tk.Frame(c, bg=T.SURF)
+        opts.pack(fill="x", pady=(14, 0))
+        RoundRadio(opts, "Put all songs in one folder", self.keep_sub_var, False, bg=T.SURF).pack(side="left", padx=(0, 28))
+        RoundRadio(opts, "Keep the device's sub-folders", self.keep_sub_var, True, bg=T.SURF).pack(side="left")
+        RoundCheck(c, "Also copy lyrics (.lrc)", self.lrc_var, bg=T.SURF).pack(anchor="w", pady=(6, 0))
 
         self.warn_var = tk.StringVar(value="")
         if not se.HAS_MUTAGEN:
             self.warn_var.set("The metadata reader is not installed, so matching only uses file names and sizes. "
                               + ("Run build.bat again." if getattr(sys, "frozen", False) else "Click the button to install it."))
-        self.warn_row = ttk.Frame(body)
+        self.warn_row = tk.Frame(body, bg=T.BG)
         self.warn_row.pack(fill="x")
-        ttk.Label(self.warn_row, textvariable=self.warn_var, style="Warn.TLabel", wraplength=700).pack(side="left")
+        ttk.Label(self.warn_row, textvariable=self.warn_var, style="Warn.TLabel", wraplength=px(700)).pack(side="left")
         if not se.HAS_MUTAGEN and not getattr(sys, "frozen", False):
-            PillButton(self.warn_row, "Install mutagen", self.install_mutagen, bg=T.BG, height=30).pack(side="left", padx=10)
+            PillButton(self.warn_row, "Install mutagen", self.install_mutagen, icon="download", bg=T.BG,
+                       height=32).pack(side="left", padx=10)
         return page
 
     # -------------------------------------------------------------------- device check page
     def _build_check_page(self):
         p = tk.Frame(self.content, bg=T.BG)
-        head = ttk.Frame(p)
+        head = tk.Frame(p, bg=T.BG)
         head.pack(fill="x")
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", lambda *_: self._refresh_results())
+        RoundEntry(head, self.search_var, icon="search", bg=T.BG, width=250).pack(side="right")
         self._heading(head, "Device check")
 
-        bar = ttk.Frame(p)
-        bar.pack(fill="x", pady=(14, 0))
+        bar = tk.Frame(p, bg=T.BG)
+        bar.pack(fill="x", pady=(16, 0))
         self.filter_var = tk.StringVar(value="all")
         self.chip_vars = {k: tk.StringVar(value=t) for k, t in
                           [("all", "All"), (se.SYNC, STATUS_TEXT[se.SYNC]), (se.RENAMED, STATUS_TEXT[se.RENAMED]),
                            (se.MISSING, STATUS_TEXT[se.MISSING]), (se.REVIEW, STATUS_TEXT[se.REVIEW])]}
         for key in ("all", se.MISSING, se.RENAMED, se.REVIEW, se.SYNC):
-            ttk.Radiobutton(bar, textvariable=self.chip_vars[key], value=key, variable=self.filter_var,
-                            style="Chip.Toolbutton", command=self._refresh_results).pack(side="left", padx=(0, 8))
-        self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", lambda *_: self._refresh_results())
-        ttk.Entry(bar, textvariable=self.search_var, width=24).pack(side="right")
-        ttk.Label(bar, text="Search", style="Muted.TLabel").pack(side="right", padx=(0, 8))
+            Chip(bar, self.filter_var, key, textvariable=self.chip_vars[key], command=self._refresh_results,
+                 bg=T.BG).pack(side="left", padx=(0, 8))
 
         self.hint_var = tk.StringVar(value=HINTS["all"])
-        ttk.Label(p, textvariable=self.hint_var, style="Hint.TLabel", wraplength=860, justify="left").pack(anchor="w", pady=(10, 8))
+        ttk.Label(p, textvariable=self.hint_var, style="Hint.TLabel", wraplength=px(860), justify="left").pack(anchor="w", pady=(12, 10))
 
-        act = ttk.Frame(p)
+        act = tk.Frame(p, bg=T.BG)
         act.pack(fill="x", pady=(0, 8))
-        self.btn_copy_top = PillButton(act, "Copy to master", self.action_copy_to_master, kind="primary")
+        self.btn_copy_top = PillButton(act, "Copy to master", self.action_copy_to_master, kind="primary", icon="copy")
         self.btn_copy_top.pack(side="left", padx=(0, 8))
         self.btn_copy_master = self.btn_copy_top
-        self.btn_rn_master = PillButton(act, "Rename in master", lambda: self.action_rename("master"))
-        self.btn_rn_dev = PillButton(act, "Rename on device", lambda: self.action_rename("device"))
-        self.btn_same = PillButton(act, "Same song", lambda: self.action_decide("same"))
-        self.btn_diff = PillButton(act, "Not same", lambda: self.action_decide("diff"))
-        self.btn_reset = PillButton(act, "Undo", lambda: self.action_decide("reset"), kind="ghost")
+        self.btn_rn_master = PillButton(act, "Rename in master", lambda: self.action_rename("master"), icon="pencil")
+        self.btn_rn_dev = PillButton(act, "Rename on device", lambda: self.action_rename("device"), icon="pencil")
+        self.btn_same = PillButton(act, "Same song", lambda: self.action_decide("same"), icon="check")
+        self.btn_diff = PillButton(act, "Not same", lambda: self.action_decide("diff"), icon="times")
+        self.btn_reset = PillButton(act, "Undo", lambda: self.action_decide("reset"), kind="ghost", icon="undo")
         for b in (self.btn_rn_master, self.btn_rn_dev, self.btn_same, self.btn_diff, self.btn_reset):
             b.pack(side="left", padx=(0, 8))
-        self.btn_more = PillButton(act, "⋯", self._more_menu, kind="secondary", padx=14)
+        self.btn_more = PillButton(act, "", self._more_menu, icon="ellipsis", padx=14)
         self.btn_more.pack(side="right")
         self.sel_var = tk.StringVar(value="0 selected")
-        ttk.Label(act, textvariable=self.sel_var, style="Muted.TLabel").pack(side="right", padx=(0, 12))
+        ttk.Label(act, textvariable=self.sel_var, style="Muted.TLabel").pack(side="right", padx=(0, 14))
 
         self.dest_show_var = tk.StringVar(value="")
-        dest = ttk.Frame(p)
-        dest.pack(fill="x", pady=(0, 6))
+        dest = tk.Frame(p, bg=T.BG)
+        dest.pack(fill="x", pady=(0, 8))
         ttk.Label(dest, textvariable=self.dest_show_var, style="Muted.TLabel").pack(side="left")
-        PillButton(dest, "Change…", self.pick_dest_master, kind="ghost", height=26, padx=10).pack(side="left", padx=6)
+        PillButton(dest, "Change", self.pick_dest_master, kind="ghost", icon="folder_open", height=28, padx=12).pack(side="left", padx=8)
 
-        self.detail = tk.Text(p, height=3, wrap="word", state="disabled", bg=T.SURF, fg="#D4D4D8",
-                              font=("Consolas", 9), relief="flat", padx=12, pady=8, bd=0)
+        det = RoundFrame(p, bg=T.BG, fill=T.SURF, radius=16, pad=(16, 10))
+        det.pack(side="bottom", fill="x", pady=(10, 0))
+        self.detail = tk.Text(det.inner, height=3, wrap="word", state="disabled", bg=T.SURF, fg="#D4D4D8",
+                              font=("Consolas", 9), relief="flat", bd=0, highlightthickness=0)
         self.detail.tag_configure("h", foreground=T.ACCENT, font=("Consolas", 9, "bold"))
-        self.detail.pack(side="bottom", fill="x", pady=(8, 0))
+        self.detail.pack(fill="x")
 
+        card = RoundFrame(p, bg=T.BG, fill=T.SURF, radius=18, pad=(10, 10), stretch=True)
+        card.pack(fill="both", expand=True)
         cols = [("status", "Status"), ("label", "Song"), ("dev", "On device"), ("mst", "In master"),
                 ("how", "Matched by"), ("note", "Note")]
-        wrap, self.tree = self._make_tree(p, cols, [120, 230, 220, 200, 100, 150], height=8)
+        wrap, self.tree = self._make_tree(card.inner, cols, [120, 230, 220, 200, 100, 150], height=8)
         wrap.pack(fill="both", expand=True)
         for cid, mw in (("status", 110), ("how", 90)):
             self.tree.column(cid, minwidth=mw, stretch=False)
@@ -607,25 +521,11 @@ class App:
         self.tree.bind("<<TreeviewSelect>>", lambda e: self._on_select())
         self.tree.bind("<Control-a>", lambda e: (self.select_all(), "break")[1])
         self.empty_lbl = tk.Label(self.tree, text="No results yet.\nPick your folders, then click \"Check Now\".",
-                                  bg=T.BG, fg=T.DIM, font=("Segoe UI", 12))
+                                  bg=T.SURF, fg=T.DIM, font=("Segoe UI", 12))
         self.empty_lbl.place(relx=0.5, rely=0.5, anchor="center")
 
-        # right-click menu (several bindings so it works however Tk reports the click)
-        self.ctx = self._menu(self.tree)
-        self.ctx_items = [("Copy to master…", self.action_copy_to_master),
-                          ("Rename in master to match device…", lambda: self.action_rename("master")),
-                          ("Rename on device to match master…", lambda: self.action_rename("device")),
-                          None,
-                          ("Same song", lambda: self.action_decide("same")),
-                          ("Not the same song", lambda: self.action_decide("diff")),
-                          ("Undo my decision", lambda: self.action_decide("reset")),
-                          None,
-                          ("Select all shown", self.select_all)]
-        for it in self.ctx_items:
-            if it is None:
-                self.ctx.add_separator()
-            else:
-                self.ctx.add_command(label=it[0], command=it[1])
+        # right-click menu: custom rounded popup
+        self._popup = None
         self.tree.bind("<Button-3>", self._rclick_select)
         self.tree.bind("<ButtonRelease-3>", self._popup_menu)
         self.tree.bind("<Shift-F10>", self._popup_menu)
@@ -639,98 +539,101 @@ class App:
         except Exception as e:
             self.log(f"[ERROR] right-click: {e}")
 
+    def _show_popup(self, entries, x, y):
+        if self._popup is not None:
+            self._popup.close()
+        self._popup = PopupMenu(self.root, entries)
+        self._popup.show(x, y)
+
     def _popup_menu(self, event):
         try:
-            self._refresh_ctx()
             x = getattr(event, "x_root", None)
             y = getattr(event, "y_root", None)
             if x is None or (x == 0 and y == 0):
                 x, y = self.root.winfo_pointerx(), self.root.winfo_pointery()
-            self.ctx.tk_popup(x, y)
+            self._show_popup(self._ctx_entries(), x, y)
         except Exception as e:
             self.log(f"[ERROR] menu: {e}")
-        finally:
-            try:
-                self.ctx.grab_release()
-            except Exception:
-                pass
 
     def _more_menu(self):
-        self._refresh_ctx()
         try:
-            self.ctx.tk_popup(self.btn_more.winfo_rootx() - 150, self.btn_more.winfo_rooty() + self.btn_more.winfo_height())
-        finally:
-            try:
-                self.ctx.grab_release()
-            except Exception:
-                pass
+            self._show_popup(self._ctx_entries(), self.btn_more.winfo_rootx() - 190,
+                             self.btn_more.winfo_rooty() + self.btn_more.winfo_height() + 4)
+        except Exception as e:
+            self.log(f"[ERROR] menu: {e}")
 
-    def _refresh_ctx(self):
+    def _ctx_entries(self):
         sel = self._selected_items()
         n = {s: sum(1 for i in sel if i.status == s) for s in STATUS_TEXT}
-        rules = {"Copy to master…": n[se.MISSING] > 0,
-                 "Rename in master to match device…": n[se.RENAMED] > 0,
-                 "Rename on device to match master…": n[se.RENAMED] > 0,
-                 "Same song": n[se.REVIEW] > 0, "Not the same song": n[se.REVIEW] > 0,
-                 "Undo my decision": any(i.method == "manual" or i.note.startswith("marked") for i in sel)}
-        for label, ok in rules.items():
-            try:
-                self.ctx.entryconfigure(label, state="normal" if (ok and not self.busy) else "disabled")
-            except Exception:
-                pass
+        free = not self.busy
+        return [
+            {"label": "Copy to master", "icon": "copy", "command": self.action_copy_to_master, "enabled": free and n[se.MISSING] > 0},
+            {"label": "Rename in master to match device", "icon": "pencil",
+             "command": lambda: self.action_rename("master"), "enabled": free and n[se.RENAMED] > 0},
+            {"label": "Rename on device to match master", "icon": "pencil",
+             "command": lambda: self.action_rename("device"), "enabled": free and n[se.RENAMED] > 0},
+            None,
+            {"label": "Same song", "icon": "check", "command": lambda: self.action_decide("same"),
+             "enabled": free and n[se.REVIEW] > 0},
+            {"label": "Not the same song", "icon": "times", "command": lambda: self.action_decide("diff"),
+             "enabled": free and n[se.REVIEW] > 0},
+            {"label": "Undo my decision", "icon": "undo", "command": lambda: self.action_decide("reset"),
+             "enabled": free and any(i.method == "manual" or i.note.startswith("marked") for i in sel)},
+            None,
+            {"label": "Select all shown", "icon": "tasks", "command": self.select_all, "enabled": True},
+        ]
 
     # -------------------------------------------------------------------- master page
     def _build_master_page(self):
         p = tk.Frame(self.content, bg=T.BG)
-        self._heading(p, "Master → device", "Pick songs from your full collection to take with you, then copy them to the player.")
-        bar = ttk.Frame(p)
-        bar.pack(fill="x", pady=(14, 0))
-        self.mfilter_var = tk.StringVar(value="not")
-        for key, text in (("not", "Not on device"), ("on", "On device"), ("all", "All")):
-            ttk.Radiobutton(bar, text=text, value=key, variable=self.mfilter_var, style="Chip.Toolbutton",
-                            command=self._refresh_master).pack(side="left", padx=(0, 8))
+        head = tk.Frame(p, bg=T.BG)
+        head.pack(fill="x")
         self.msearch_var = tk.StringVar()
         self.msearch_var.trace_add("write", lambda *_: self._refresh_master())
-        ttk.Entry(bar, textvariable=self.msearch_var, width=24).pack(side="right")
-        ttk.Label(bar, text="Search", style="Muted.TLabel").pack(side="right", padx=(0, 8))
+        RoundEntry(head, self.msearch_var, icon="search", bg=T.BG, width=250).pack(side="right")
+        self._heading(head, "Master → device", "Pick songs from your full collection to take with you.")
+        bar = tk.Frame(p, bg=T.BG)
+        bar.pack(fill="x", pady=(16, 0))
+        self.mfilter_var = tk.StringVar(value="not")
+        for key, text in (("not", "Not on device"), ("on", "On device"), ("all", "All")):
+            Chip(bar, self.mfilter_var, key, text=text, command=self._refresh_master, bg=T.BG).pack(side="left", padx=(0, 8))
         self.mcount_var = tk.StringVar(value="")
-        ttk.Label(p, textvariable=self.mcount_var, style="Muted.TLabel").pack(anchor="w", pady=(10, 6))
+        ttk.Label(p, textvariable=self.mcount_var, style="Muted.TLabel").pack(anchor="w", pady=(12, 8))
 
-        box = tk.Frame(p, bg=T.SURF)
-        box.pack(side="bottom", fill="x", pady=(10, 0))
-        inner = ttk.Frame(box, style="Card.TFrame", padding=(16, 12))
-        inner.pack(fill="x")
-        inner.columnconfigure(3, weight=1)
-        ttk.Label(inner, text="Target", style="Card.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 8))
+        send = RoundFrame(p, bg=T.BG, fill=T.SURF, radius=20, pad=(22, 16))
+        send.pack(side="bottom", fill="x", pady=(10, 0))
+        inner = send.inner
+        top = tk.Frame(inner, bg=T.SURF)
+        top.pack(fill="x")
+        ttk.Label(top, text="Send to", style="CardTitle.TLabel").pack(side="left", padx=(0, 14))
         self.dev_target_var = tk.StringVar()
-        self.dev_combo = ttk.Combobox(inner, textvariable=self.dev_target_var, state="readonly", width=16)
-        self.dev_combo.grid(row=0, column=1, sticky="w")
-        self.dev_combo.bind("<<ComboboxSelected>>", lambda e: self._update_master_summary())
-        ttk.Label(inner, text="Sub-folder (optional)", style="Card.TLabel").grid(row=0, column=2, sticky="e", padx=(16, 8))
+        self.target_box = tk.Frame(top, bg=T.SURF)
+        self.target_box.pack(side="left")
         self.dev_sub_var = tk.StringVar()
-        ttk.Entry(inner, textvariable=self.dev_sub_var).grid(row=0, column=3, sticky="we")
+        RoundEntry(top, self.dev_sub_var, icon="folder", bg=T.SURF, width=220).pack(side="right")
+        ttk.Label(top, text="Sub-folder (optional)", style="CardMuted.TLabel").pack(side="right", padx=(0, 10))
         self.dev_sub_var.trace_add("write", lambda *_: self._update_master_summary())
+        low = tk.Frame(inner, bg=T.SURF)
+        low.pack(fill="x", pady=(12, 0))
+        self.btn_copy_dev = PillButton(low, "Copy to device", self.action_copy_to_device, kind="primary", icon="upload",
+                                       bg=T.SURF)
+        self.btn_copy_dev.pack(side="right")
         self.mlrc_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(inner, text="Also copy lyrics (.lrc)", variable=self.mlrc_var,
-                        style="Card.TCheckbutton").grid(row=1, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        RoundCheck(low, "Also copy lyrics (.lrc)", self.mlrc_var, bg=T.SURF).pack(side="left", padx=(0, 20))
         self.msum_var = tk.StringVar(value="No songs selected.")
-        self.msum_lbl = ttk.Label(inner, textvariable=self.msum_var, style="CardMuted.TLabel")
-        self.msum_lbl.grid(row=1, column=3, sticky="w", pady=(8, 0), padx=(0, 12))
-        self.btn_copy_dev = PillButton(inner, "Copy to device", self.action_copy_to_device, kind="primary", bg=T.SURF)
-        self.btn_copy_dev.grid(row=0, column=4, rowspan=2, padx=(12, 0))
+        self.msum_lbl = ttk.Label(low, textvariable=self.msum_var, style="CardMuted.TLabel")
+        self.msum_lbl.pack(side="left")
 
+        card = RoundFrame(p, bg=T.BG, fill=T.SURF, radius=18, pad=(10, 10), stretch=True)
+        card.pack(fill="both", expand=True)
         cols = [("status", "Status"), ("title", "Song"), ("artist", "Artist"), ("dur", "Length"),
                 ("size", "Size"), ("loc", "Location in master")]
-        wrap, self.mtree = self._make_tree(p, cols, [140, 260, 180, 70, 80, 260], height=10)
+        wrap, self.mtree = self._make_tree(card.inner, cols, [140, 260, 180, 70, 80, 260], height=10)
         wrap.pack(fill="both", expand=True)
         self.mtree.tag_configure("on", foreground=T.OK)
         self.mtree.tag_configure("maybe", foreground=T.INFO)
         self.mtree.bind("<<TreeviewSelect>>", lambda e: self._update_master_summary())
         self.mtree.bind("<Control-a>", lambda e: (self.mtree.selection_set(self.mtree.get_children()), "break")[1])
-        self.mctx = self._menu(self.mtree)
-        self.mctx.add_command(label="Copy to device…", command=self.action_copy_to_device)
-        self.mctx.add_command(label="Select all shown",
-                              command=lambda: self.mtree.selection_set(self.mtree.get_children()))
         self.mtree.bind("<Button-3>", self._mrclick_select)
         self.mtree.bind("<ButtonRelease-3>", self._mpopup)
         return p
@@ -745,22 +648,26 @@ class App:
 
     def _mpopup(self, event):
         try:
-            self.mctx.tk_popup(event.x_root, event.y_root)
+            sel = [i for i in self.mtree.selection() if i in self.row_master]
+            self._show_popup([
+                {"label": "Copy to device", "icon": "upload", "command": self.action_copy_to_device,
+                 "enabled": (not self.busy) and bool(sel)},
+                None,
+                {"label": "Select all shown", "icon": "tasks",
+                 "command": lambda: self.mtree.selection_set(self.mtree.get_children()), "enabled": True},
+            ], event.x_root, event.y_root)
         except Exception as e:
             self.log(f"[ERROR] menu: {e}")
-        finally:
-            try:
-                self.mctx.grab_release()
-            except Exception:
-                pass
 
     # -------------------------------------------------------------------- log page
     def _build_log_page(self):
         p = tk.Frame(self.content, bg=T.BG)
         self._heading(p, "Activity log", "Everything the app did, including warnings and errors.")
-        self.logbox = tk.Text(p, wrap="word", state="disabled", bg=T.SURF, fg="#D4D4D8", insertbackground="#FFFFFF",
-                              font=("Consolas", 9), relief="flat", padx=12, pady=10, bd=0)
-        self.logbox.pack(fill="both", expand=True, pady=(14, 0))
+        card = RoundFrame(p, bg=T.BG, fill=T.SURF, radius=18, pad=(16, 12), stretch=True)
+        card.pack(fill="both", expand=True, pady=(16, 0))
+        self.logbox = tk.Text(card.inner, wrap="word", state="disabled", bg=T.SURF, fg="#D4D4D8",
+                              insertbackground="#FFFFFF", font=("Consolas", 9), relief="flat", bd=0, highlightthickness=0)
+        self.logbox.pack(fill="both", expand=True)
         return p
 
     # ------------------------------------------------------ settings & helpers
@@ -780,7 +687,7 @@ class App:
 
     def _update_dest_label(self):
         d = self.dest_master_var.get().strip()
-        self.dest_show_var.set(f"Copies go to:  {d}" if d else "Copies go to:  (not set yet - click Change…)")
+        self.dest_show_var.set(f"Copies go to:  {d}" if d else "Copies go to:  (not set yet)")
 
     def startup_check(self):
         """Tell the user right away if the saved folders (or the player) are not reachable."""
@@ -815,10 +722,17 @@ class App:
         return list(self.dev_list.get(0, "end"))
 
     def _sync_dev_combo(self, keep: str = ""):
+        """Keep the 'Send to' radio chips in line with the device list."""
         devs = self._device_list()
-        self.dev_combo.configure(values=devs)
         cur = keep or self.dev_target_var.get()
         self.dev_target_var.set(cur if cur in devs else (devs[0] if devs else ""))
+        for w in (self.target_box.winfo_children() or []):
+            w.destroy()
+        for d in devs:
+            Chip(self.target_box, self.dev_target_var, d, text=d, command=self._update_master_summary,
+                 bg=T.SURF, icon="hdd", height=32).pack(side="left", padx=(0, 8))
+        if not devs:
+            ttk.Label(self.target_box, text="Add a device first", style="CardMuted.TLabel").pack(side="left")
 
     def log(self, text: str):
         self.logbox.configure(state="normal")
@@ -877,7 +791,7 @@ class App:
     def _set_busy(self, busy: bool, status: str = ""):
         self.busy = busy
         st = "disabled" if busy else "normal"
-        for b in (self.btn_scan, self.btn_master, self.btn_add_dev, self.btn_del_dev, self.btn_copy_dev):
+        for b in (self.btn_scan, self.btn_master, self.btn_add_dev, self.btn_copy_dev):
             b.configure(state=st)
         self.btn_cancel.configure(state="normal" if busy else "disabled")
         if busy:
@@ -1115,24 +1029,26 @@ class App:
         win.title(title)
         win.configure(bg=T.BG)
         win.transient(self.root)
-        win.geometry("860x460")
-        ttk.Label(win, text=title, style="Title.TLabel", font=("Segoe UI", 16, "bold")).pack(anchor="w", padx=22, pady=(18, 2))
-        ttk.Label(win, text=intro, style="Muted.TLabel", wraplength=800, justify="left").pack(anchor="w", padx=22, pady=(0, 6))
+        win.geometry(f"{px(880)}x{px(500)}")
+        ttk.Label(win, text=title, style="Title.TLabel", font=("Segoe UI", 16, "bold")).pack(anchor="w", padx=24, pady=(20, 2))
+        ttk.Label(win, text=intro, style="Muted.TLabel", wraplength=px(820), justify="left").pack(anchor="w", padx=24, pady=(0, 6))
         if warn:
-            ttk.Label(win, text=warn, style="Warn.TLabel", wraplength=800, justify="left").pack(anchor="w", padx=22)
-        wrap, tree = self._make_tree(win, [(f"c{i}", c) for i, c in enumerate(columns)], [400, 400][:len(columns)], height=12)
-        wrap.pack(fill="both", expand=True, padx=22, pady=8)
+            ttk.Label(win, text=warn, style="Warn.TLabel", wraplength=px(820), justify="left").pack(anchor="w", padx=24)
+        btns = tk.Frame(win, bg=T.BG)
+        btns.pack(side="bottom", fill="x", padx=24, pady=(0, 18))
+        card = RoundFrame(win, bg=T.BG, fill=T.SURF, radius=16, pad=(10, 10), stretch=True)
+        card.pack(fill="both", expand=True, padx=24, pady=10)
+        wrap, tree = self._make_tree(card.inner, [(f"c{i}", c) for i, c in enumerate(columns)], [400, 400][:len(columns)], height=12)
+        wrap.pack(fill="both", expand=True)
         for r in rows:
             tree.insert("", "end", values=r)
         result = {"ok": False}
-        btns = ttk.Frame(win)
-        btns.pack(fill="x", padx=22, pady=(0, 16))
 
         def yes():
             result["ok"] = True
             win.destroy()
-        PillButton(btns, ok_text, yes, kind="primary", min_width=100).pack(side="right")
-        PillButton(btns, "Cancel", win.destroy, kind="secondary").pack(side="right", padx=(0, 8))
+        PillButton(btns, ok_text, yes, kind="primary", icon="check", min_width=120).pack(side="right")
+        PillButton(btns, "Cancel", win.destroy, kind="secondary", icon="times").pack(side="right", padx=(0, 8))
         set_dark_titlebar(win)
         try:
             win.grab_set()
@@ -1248,7 +1164,7 @@ class App:
                     over = True
                     text += "  ⚠ WON'T FIT"
         self.msum_var.set(text)
-        self.msum_lbl.configure(style="Err.TLabel" if over else "CardMuted.TLabel")
+        self.msum_lbl.configure(style="CardErr.TLabel" if over else "CardMuted.TLabel")
         self.btn_copy_dev.configure(state="normal" if (not self.busy and not over) else "disabled")
 
     def _device_dest(self) -> str:

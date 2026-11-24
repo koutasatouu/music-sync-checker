@@ -25,6 +25,7 @@ echo [3/4] Building the app...
     --icon "icon.ico" ^
     --splash "splash.png" ^
     --add-data "icon.ico;." --add-data "icon.png;." ^
+    --add-data "fontawesome-webfont.ttf;." --add-data "FONT-LICENSE.txt;." ^
     --collect-submodules mutagen ^
     "music_sync_checker.py" || goto :fail
 
@@ -35,11 +36,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0create_shortcut.ps1" ^
 
 echo.
 echo ============================================================
-echo  Done!  Open Start, type "Music Sync Checker",
-echo  right-click it and choose "Pin to Start" (or "Pin to taskbar").
+echo  Done!  Starting Music Sync Checker...
+echo  (Tip: Start menu - "Music Sync Checker" - right-click - Pin to Start)
 echo ============================================================
 start "" "dist\MusicSyncChecker\MusicSyncChecker.exe"
-pause
 exit /b 0
 
 :fail
